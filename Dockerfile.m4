@@ -267,6 +267,7 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		libglu1:i386 \
 		libxtst6:i386 \
 		libxv1:i386 \
+		mesa-opencl-icd:i386 \
 		ocl-icd-libopencl1:i386 \
 ]])m4_dnl
 	&& apt-get install -y --no-install-recommends \
@@ -277,6 +278,7 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		bash \
 		bash-completion \
 		binutils \
+		clinfo \
 		curl \
 		desktop-file-utils \
 		dialog \
