@@ -56,6 +56,7 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		nasm \
 		ocl-icd-opencl-dev \
 		pkg-config \
+		systemd \
 		texinfo \
 		xserver-xorg-dev-hwe-18.04 \
 		xsltproc \
@@ -250,7 +251,7 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		policykit-1 \
 		pulseaudio \
 		pulseaudio-utils \
-		runit \
+		systemd \
 		tzdata \
 		xserver-xorg-core-hwe-18.04 \
 		xserver-xorg-input-all-hwe-18.04 \
@@ -361,10 +362,6 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		zip \
 	&& rm -rf /var/lib/apt/lists/*
 
-# Copy Tini build
-m4_define([[TINI_IMAGE_TAG]], m4_ifdef([[CROSS_ARCH]], [[latest-CROSS_ARCH]], [[latest]]))m4_dnl
-COPY --from=docker.io/hectormolinero/tini:TINI_IMAGE_TAG --chown=root:root /usr/bin/tini /usr/bin/tini
-
 # Install libjpeg-turbo from package
 COPY --from=build --chown=root:root /tmp/libjpeg-turbo/build/libjpeg-turbo_*.deb /tmp/libjpeg-turbo.deb
 RUN dpkg -i /tmp/libjpeg-turbo.deb && rm -f /tmp/libjpeg-turbo.deb
@@ -455,17 +452,22 @@ RUN mkdir /tmp/.X11-unix/ \
 # Configure server for use with VirtualGL
 RUN vglserver_config -config +s +f -t
 
-# Forward logs to Docker log collector
-RUN ln -sf /dev/stdout /var/log/xdummy.log
-RUN ln -sf /dev/stdout /var/log/xrdp.log
-RUN ln -sf /dev/stdout /var/log/xrdp-sesman.log
+# Remove default systemd unit dependencies
+RUN find \
+		/lib/systemd/system/*.target.wants/ \
+		/etc/systemd/system/*.target.wants/ \
+		-not -name 'dbus*' \
+		-not -name 'systemd-journal*' \
+		-not -name 'systemd-user-sessions.service' \
+		-not -name 'systemd-tmpfiles-setup.service' \
+		-mindepth 1 -print -delete
+
+# Regenerate temporary files and directories
+RUN systemd-tmpfiles --remove --create
 
 # Copy and enable services
-COPY --chown=root:root ./scripts/service/ /etc/sv/
-RUN ln -sv /etc/sv/sshd /etc/service/
-RUN ln -sv /etc/sv/dbus-daemon /etc/service/
-RUN ln -sv /etc/sv/xrdp /etc/service/
-RUN ln -sv /etc/sv/xrdp-sesman /etc/service/
+COPY --chown=root:root ./scripts/service/ /etc/systemd/system/
+RUN systemctl enable ssh.service xrdp.service xrdp-sesman.service
 
 # Copy scripts
 COPY --chown=root:root ./scripts/bin/ /usr/local/bin/
@@ -480,4 +482,5 @@ EXPOSE 3322/tcp
 # Expose RDP port
 EXPOSE 3389/tcp
 
+STOPSIGNAL SIGRTMIN+3
 ENTRYPOINT ["/usr/local/bin/container-init"]

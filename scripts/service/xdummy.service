@@ -1,0 +1,11 @@
+[Unit]
+Description=xdummy service
+
+[Service]
+Type=simple
+StandardOutput=file:/var/log/xdummy.log
+StandardError=file:/var/log/xdummy.log
+ExecStart=/usr/bin/Xorg -noreset -nolisten tcp +extension GLX +extension RANDR +extension RENDER -logfile /var/log/xdummy.log :0
+
+[Install]
+WantedBy=multi-user.target

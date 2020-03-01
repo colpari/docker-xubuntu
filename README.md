@@ -11,10 +11,15 @@ A Docker image based on Ubuntu 18.04 with the Xfce desktop environment,
 docker run \
   --name xubuntu \
   --detach --tty \
+  --cap-add SYS_ADMIN \
   --shm-size 2g \
   --publish 3322:3322/tcp \
   --publish 3389:3389/tcp \
   --device /dev/dri:/dev/dri \
+  --mount type=tmpfs,dst=/tmp/ \
+  --mount type=tmpfs,dst=/run/ \
+  --mount type=tmpfs,dst=/run/lock/ \
+  --mount type=tmpfs,dst=/sys/fs/cgroup/ \
   hectormolinero/xubuntu:latest
 ```
 

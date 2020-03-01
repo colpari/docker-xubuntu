@@ -42,6 +42,10 @@ printf -- '%s\n' "Creating \"${CONTAINER_NAME:?}\" container..."
 	--publish 3389:3389/tcp \
 	--env ENABLE_VIRTUALGL=true \
 	--device /dev/dri:/dev/dri \
+	--mount type=tmpfs,dst=/tmp/ \
+	--mount type=tmpfs,dst=/run/ \
+	--mount type=tmpfs,dst=/run/lock/ \
+	--mount type=tmpfs,dst=/sys/fs/cgroup/ \
 	"${IMAGE_NAME:?}" "$@" >/dev/null
 
 printf -- '%s\n\n' 'Done!'
