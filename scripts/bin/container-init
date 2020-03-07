@@ -38,7 +38,11 @@ chmod -R 700 /run/user/"${UNPRIVILEGED_USER_UID:?}"/
 chown -R "${UNPRIVILEGED_USER_NAME:?}:" /run/user/"${UNPRIVILEGED_USER_UID:?}"/
 
 # Set unprivileged user password
-printf '%s' "${UNPRIVILEGED_USER_NAME:?}:${UNPRIVILEGED_USER_PASSWORD:?}" | chpasswd
+if [ -n "${UNPRIVILEGED_USER_PASSWORD?}" ]; then
+	printf '%s' "${UNPRIVILEGED_USER_NAME:?}:${UNPRIVILEGED_USER_PASSWORD:?}" | chpasswd
+else
+	passwd -d "${UNPRIVILEGED_USER_NAME:?}"
+fi
 unset UNPRIVILEGED_USER_PASSWORD
 
 # Dump environment variables
@@ -51,7 +55,7 @@ fi
 
 # Create RANDFILE if it does not exist
 RANDFILE=${RANDFILE-${HOME:?}/.rnd}
-if [ ! -f "${RANDFILE:?}" ]; then
+if [ ! -f "${RANDFILE:?}" ] && [ -c /dev/urandom ]; then
 	dd if=/dev/urandom of="${RANDFILE:?}" bs=256 count=1 >/dev/null 2>&1
 fi
 
@@ -63,7 +67,7 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 	ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N '' >/dev/null
 fi
 
-# Generate self-signed certificate
+# Generate RDP certificate if it does not exist
 if [ ! -f "${RDP_TLS_KEY_PATH:?}" ] || [ ! -f "${RDP_TLS_CERT_PATH:?}" ]; then
 	KEY_FILE=${RDP_TLS_KEY_PATH:?}
 	CRT_FILE=${RDP_TLS_CERT_PATH:?}
