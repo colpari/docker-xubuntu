@@ -146,7 +146,7 @@ RUN dpkg -i ./virtualgl32_*.deb
 ]])m4_dnl
 
 # Build XRDP
-ARG XRDP_TREEISH=v0.9.12
+ARG XRDP_TREEISH=v0.9.13
 ARG XRDP_REMOTE=https://github.com/neutrinolabs/xrdp.git
 RUN mkdir /tmp/xrdp/
 WORKDIR /tmp/xrdp/
@@ -167,7 +167,7 @@ RUN make -j"$(nproc)"
 RUN checkinstall --default --pkgname=xrdp --pkgversion=0 --pkgrelease=0
 
 # Build xorgxrdp
-ARG XORGXRDP_TREEISH=v0.2.12
+ARG XORGXRDP_TREEISH=v0.2.13
 ARG XORGXRDP_REMOTE=https://github.com/neutrinolabs/xorgxrdp.git
 RUN mkdir /tmp/xorgxrdp/
 WORKDIR /tmp/xorgxrdp/
@@ -274,7 +274,6 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		adwaita-qt \
 		apt-transport-https \
 		apt-utils \
-		atril \
 		bash \
 		bash-completion \
 		binutils \
@@ -284,20 +283,16 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		dialog \
 		engrampa \
 		exo-utils \
-		ffmpegthumbnailer \
 		file \
 		firefox \
 		fonts-dejavu \
 		fonts-liberation \
 		fonts-noto \
 		fonts-noto-color-emoji \
-		fuse \
+		fonts-ubuntu \
 		git \
 		gnome-keyring \
 		gnupg \
-		gstreamer1.0-plugins-base \
-		gstreamer1.0-plugins-good \
-		gstreamer1.0-plugins-ugly \
 		gtk2-engines-pixbuf \
 		htop \
 		indicator-application \
@@ -308,11 +303,11 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		indicator-sound \
 		iproute2 \
 		iputils-ping \
-		less \
 		libavcodec-extra \
 		libcanberra-gtk-module \
 		libcanberra-gtk3-module \
 		libgtk-3-bin \
+		lsof \
 		lsscsi \
 		menu \
 		menu-xdg \
@@ -326,7 +321,7 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		net-tools \
 		netcat-openbsd \
 		openjdk-8-jre \
-		p7zip-full \
+		parole \
 		pavucontrol \
 		pciutils \
 		procps \
@@ -334,11 +329,9 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		ristretto \
 		sudo \
 		thunar-archive-plugin \
-		thunar-volman \
 		tumbler \
 		unzip \
 		usbutils \
-		vlc \
 		wget \
 		xauth \
 		xdg-user-dirs \
@@ -346,17 +339,15 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		xfce4 \
 		xfce4-indicator-plugin \
 		xfce4-notifyd \
-		xfce4-power-manager-plugins \
 		xfce4-pulseaudio-plugin \
+		xfce4-screenshooter \
 		xfce4-statusnotifier-plugin \
 		xfce4-taskmanager \
 		xfce4-terminal \
 		xfce4-whiskermenu-plugin \
-		xfce4-xkb-plugin \
 		xfonts-base \
 		xfpanel-switch \
 		xinput \
-		xterm \
 		xubuntu-default-settings \
 		xutils \
 		xz-utils \
