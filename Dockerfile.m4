@@ -9,10 +9,8 @@ m4_ifdef([[CROSS_QEMU]], [[COPY --from=docker.io/hectormolinero/qemu-user-static
 
 # Install system packages
 RUN export DEBIAN_FRONTEND=noninteractive \
-	# Uncomment source packages repositories
 	&& sed -i 's/^#\s*\(deb-src\s\)/\1/g' /etc/apt/sources.list \
 m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
-	# Enable multiarch support
 	&& dpkg --add-architecture i386 \
 ]])m4_dnl
 	&& apt-get update \
@@ -164,7 +162,7 @@ RUN ./configure \
 		--enable-mp3lame \
 		--enable-pixman
 RUN make -j"$(nproc)"
-RUN checkinstall --default --pkgname=xrdp --pkgversion=0 --pkgrelease=0
+RUN checkinstall --default --pkgname=xrdp --pkgversion=999 --pkgrelease=0
 
 # Build xorgxrdp
 ARG XORGXRDP_TREEISH=v0.2.13
@@ -177,7 +175,7 @@ RUN git submodule update --init --recursive
 RUN ./bootstrap
 RUN ./configure --enable-glamor
 RUN make -j"$(nproc)"
-RUN checkinstall --default --pkgname=xorgxrdp --pkgversion=0 --pkgrelease=0
+RUN checkinstall --default --pkgname=xorgxrdp --pkgversion=999 --pkgrelease=0
 
 # Build XRDP PulseAudio module
 ARG XRDP_PULSEAUDIO_TREEISH=v0.4
@@ -196,7 +194,7 @@ RUN git submodule update --init --recursive
 RUN ./bootstrap
 RUN ./configure PULSE_DIR=/tmp/pulseaudio/
 RUN make -j"$(nproc)"
-RUN checkinstall --default --pkgname=xrdp-pulseaudio --pkgversion=0 --pkgrelease=0
+RUN checkinstall --default --pkgname=xrdp-pulseaudio --pkgversion=999 --pkgrelease=0
 
 ##################################################
 ## "xubuntu" stage
@@ -245,6 +243,9 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		libxv1 \
 		locales \
 		mesa-opencl-icd \
+		mesa-va-drivers \
+		mesa-vdpau-drivers \
+		mesa-vulkan-drivers \
 		ocl-icd-libopencl1 \
 		openssh-server \
 		openssl \
@@ -253,13 +254,13 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		pulseaudio-utils \
 		systemd \
 		tzdata \
+		vulkan-utils \
 		xserver-xorg-core-hwe-18.04 \
 		xserver-xorg-input-all-hwe-18.04 \
 		xserver-xorg-input-evdev-hwe-18.04 \
 		xserver-xorg-input-joystick-hwe-18.04 \
 		xserver-xorg-video-all-hwe-18.04 \
 m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
-	&& apt-get install -y --no-install-recommends \
 		libegl1:i386 \
 		libgl1:i386 \
 		libgl1-mesa-dri:i386 \
@@ -268,9 +269,11 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		libxtst6:i386 \
 		libxv1:i386 \
 		mesa-opencl-icd:i386 \
+		mesa-va-drivers:i386 \
+		mesa-vdpau-drivers:i386 \
+		mesa-vulkan-drivers:i386 \
 		ocl-icd-libopencl1:i386 \
 ]])m4_dnl
-	&& apt-get install -y --no-install-recommends \
 		adwaita-qt \
 		apt-transport-https \
 		apt-utils \
@@ -290,17 +293,14 @@ m4_ifelse(ENABLE_32BIT, 1, [[m4_dnl
 		fonts-noto \
 		fonts-noto-color-emoji \
 		fonts-ubuntu \
+		fuse \
 		git \
 		gnome-keyring \
 		gnupg \
 		gtk2-engines-pixbuf \
 		htop \
 		indicator-application \
-		indicator-datetime \
-		indicator-keyboard \
 		indicator-messages \
-		indicator-session \
-		indicator-sound \
 		iproute2 \
 		iputils-ping \
 		libavcodec-extra \
