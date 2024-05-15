@@ -75,7 +75,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 	&& apt-get clean
 
 # Build libjpeg-turbo
-ARG LIBJPEG_TURBO_TREEISH=3.0.2
+ARG LIBJPEG_TURBO_TREEISH=3.0.3
 ARG LIBJPEG_TURBO_REMOTE=https://github.com/libjpeg-turbo/libjpeg-turbo.git
 RUN mkdir /tmp/libjpeg-turbo/
 WORKDIR /tmp/libjpeg-turbo/
@@ -149,7 +149,7 @@ RUN make deb
 RUN dpkg -i ./turbovnc_*.deb
 
 # Build xrdp
-ARG XRDP_TREEISH=v0.10.0-beta.3
+ARG XRDP_TREEISH=v0.10.0
 ARG XRDP_REMOTE=https://github.com/neutrinolabs/xrdp.git
 RUN mkdir /tmp/xrdp/
 WORKDIR /tmp/xrdp/
