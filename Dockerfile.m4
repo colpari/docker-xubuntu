@@ -5,7 +5,6 @@ m4_changequote([[, ]])
 ##################################################
 
 m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:24.04]], [[FROM docker.io/ubuntu:24.04]]) AS build
-m4_ifdef([[CROSS_QEMU]], [[COPY --from=docker.io/hectorm/qemu-user-static:latest CROSS_QEMU CROSS_QEMU]])
 
 SHELL ["/bin/sh", "-euc"]
 
@@ -24,7 +23,6 @@ RUN <<-EOF
 		bison \
 		build-essential \
 		ca-certificates \
-		checkinstall \
 		cmake \
 		dbus-x11 \
 		devscripts \
@@ -227,7 +225,6 @@ EOF
 ##################################################
 
 m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:24.04]], [[FROM docker.io/ubuntu:24.04]]) AS main
-m4_ifdef([[CROSS_QEMU]], [[COPY --from=docker.io/hectorm/qemu-user-static:latest CROSS_QEMU CROSS_QEMU]])
 
 SHELL ["/bin/sh", "-euc"]
 
@@ -255,7 +252,7 @@ RUN <<-EOF
 		libepoxy0 \
 		libfdk-aac2 \
 		libfreetype6 \
-		libfuse2 \
+		libfuse2t64 \
 		libgbm1 \
 		libgl1 \
 		libgl1-mesa-dri \
@@ -268,7 +265,7 @@ RUN <<-EOF
 		libpam0g \
 		libpixman-1-0 \
 		libpulse0 \
-		libssl3 \
+		libssl3t64 \
 		libsystemd0 \
 		libx11-6 \
 		libx11-xcb1 \
@@ -279,7 +276,7 @@ RUN <<-EOF
 		libxfixes3 \
 		libxml2 \
 		libxrandr2 \
-		libxt6 \
+		libxt6t64 \
 		libxtst6 \
 		libxv1 \
 		locales \
