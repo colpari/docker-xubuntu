@@ -31,18 +31,20 @@ RUN <<-EOF
 		git \
 		intltool \
 		libbz2-dev \
+		libdrm-dev \
 		libegl-dev \
 		libegl1-mesa-dev \
 		libepoxy-dev \
 		libfdk-aac-dev \
 		libfreetype-dev \
-		libfuse-dev \
+		libfuse3-dev \
 		libgbm-dev \
 		libgl-dev \
 		libgles-dev \
 		libglu1-mesa-dev \
 		libglvnd-dev \
 		libglx-dev \
+		libimlib2-dev \
 		libmp3lame-dev \
 		libopus-dev \
 		libpam0g-dev \
@@ -53,6 +55,7 @@ RUN <<-EOF
 		libtool \
 		libx11-dev \
 		libx11-xcb-dev \
+		libx264-dev \
 		libxcb-glx0-dev \
 		libxcb-keysyms1-dev \
 		libxcb1-dev \
@@ -60,6 +63,7 @@ RUN <<-EOF
 		libxfixes-dev \
 		libxml2-dev \
 		libxrandr-dev \
+		libxshmfence-dev \
 		libxt-dev \
 		libxtst-dev \
 		libxv-dev \
@@ -70,6 +74,7 @@ RUN <<-EOF
 		x11-xkb-utils \
 		xauth \
 		xkb-data \
+		xserver-xorg-core \
 		xserver-xorg-dev \
 		xsltproc \
 		xutils-dev \
@@ -78,7 +83,7 @@ RUN <<-EOF
 EOF
 
 # Build libjpeg-turbo
-ARG LIBJPEG_TURBO_TREEISH=3.0.3
+ARG LIBJPEG_TURBO_TREEISH=3.1.1
 ARG LIBJPEG_TURBO_REMOTE=https://github.com/libjpeg-turbo/libjpeg-turbo.git
 WORKDIR /tmp/libjpeg-turbo/
 RUN <<-EOF
@@ -99,7 +104,7 @@ RUN <<-EOF
 EOF
 
 # Build VirtualGL
-ARG VIRTUALGL_TREEISH=3.1.1
+ARG VIRTUALGL_TREEISH=3.1.3
 ARG VIRTUALGL_REMOTE=https://github.com/VirtualGL/virtualgl.git
 WORKDIR /tmp/virtualgl/
 RUN <<-EOF
@@ -121,7 +126,7 @@ RUN <<-EOF
 EOF
 
 # Build TurboVNC
-ARG TURBOVNC_TREEISH=3.1.1
+ARG TURBOVNC_TREEISH=3.2
 ARG TURBOVNC_REMOTE=https://github.com/TurboVNC/turbovnc.git
 WORKDIR /tmp/turbovnc/
 RUN <<-EOF
@@ -151,7 +156,7 @@ RUN <<-EOF
 EOF
 
 # Build xrdp
-ARG XRDP_TREEISH=v0.10.1
+ARG XRDP_TREEISH=v0.10.3
 ARG XRDP_REMOTE=https://github.com/neutrinolabs/xrdp.git
 WORKDIR /tmp/xrdp/
 RUN <<-EOF
@@ -166,18 +171,24 @@ RUN <<-EOF
 		--enable-strict-locations \
 		--enable-vsock \
 		--enable-tjpeg \
-		--enable-fuse \
+		--enable-pixman \
+		--enable-x264 \
+		--enable-rfxcodec \
+		--enable-painter \
+		--enable-rdpsndaudin \
 		--enable-fdkaac \
 		--enable-opus \
 		--enable-mp3lame \
-		--enable-pixman \
-		--enable-ipv6
+		--enable-fuse \
+		--enable-ipv6 \
+		--with-freetype2 \
+		--with-imlib2
 	make -j"$(nproc)" install
 	rm -f /opt/xrdp/etc/xrdp/rsakeys.ini /opt/xrdp/etc/xrdp/*.pem
 EOF
 
 # Build xorgxrdp
-ARG XORGXRDP_TREEISH=v0.10.2
+ARG XORGXRDP_TREEISH=v0.10.4
 ARG XORGXRDP_REMOTE=https://github.com/neutrinolabs/xorgxrdp.git
 WORKDIR /tmp/xorgxrdp/
 RUN <<-EOF
@@ -196,7 +207,7 @@ RUN <<-EOF
 EOF
 
 # Build xrdp PulseAudio module
-ARG XRDP_PULSEAUDIO_TREEISH=v0.7
+ARG XRDP_PULSEAUDIO_TREEISH=v0.8
 ARG XRDP_PULSEAUDIO_REMOTE=https://github.com/neutrinolabs/pulseaudio-module-xrdp.git
 WORKDIR /tmp/
 RUN <<-EOF
@@ -252,7 +263,7 @@ RUN <<-EOF
 		libepoxy0 \
 		libfdk-aac2 \
 		libfreetype6 \
-		libfuse2t64 \
+		libfuse3-3 \
 		libgbm1 \
 		libgl1 \
 		libgl1-mesa-dri \
@@ -260,6 +271,7 @@ RUN <<-EOF
 		libglu1 \
 		libglvnd0 \
 		libglx-mesa0 \
+		libimlib2 \
 		libmp3lame0 \
 		libopus0 \
 		libpam0g \
@@ -269,6 +281,7 @@ RUN <<-EOF
 		libsystemd0 \
 		libx11-6 \
 		libx11-xcb1 \
+		libx264-164 \
 		libxcb-glx0 \
 		libxcb-keysyms1 \
 		libxcb1 \
@@ -276,6 +289,7 @@ RUN <<-EOF
 		libxfixes3 \
 		libxml2 \
 		libxrandr2 \
+		libxshmfence1 \
 		libxt6t64 \
 		libxtst6 \
 		libxv1 \
@@ -318,24 +332,24 @@ m4_ifelse(ENABLE_INTEL_SUPPORT, 1, [[m4_dnl
 m4_ifelse(ENABLE_NVIDIA_SUPPORT, 1, [[m4_dnl
 	apt-get install -y --no-install-recommends -o APT::Immediate-Configure=0 \
 		libdrm-nouveau2 \
-		libnvidia-cfg1-550 \
-		libnvidia-compute-550 \
-		libnvidia-decode-550 \
-		libnvidia-encode-550 \
-		libnvidia-extra-550 \
-		libnvidia-fbc1-550 \
-		libnvidia-gl-550 \
+		libnvidia-cfg1-570 \
+		libnvidia-compute-570 \
+		libnvidia-decode-570 \
+		libnvidia-encode-570 \
+		libnvidia-extra-570 \
+		libnvidia-fbc1-570 \
+		libnvidia-gl-570 \
 		xserver-xorg-video-nouveau \
-		xserver-xorg-video-nvidia-550
+		xserver-xorg-video-nvidia-570
 ]])m4_dnl
 	rm -rf /var/lib/apt/lists/*
 	rm -f /etc/ssh/ssh_host_*_key
 EOF
 
-# Add Mozilla Team repository
+# Add Mozilla repository
 RUN <<-EOF
-	curl --proto '=https' --tlsv1.3 -sSf 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0AB215679C571D1C8325275B9BDB3D89CE49EC21' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mozillateam.gpg
-	printf '%s\n' "deb [signed-by=/etc/apt/trusted.gpg.d/mozillateam.gpg] https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/mozillateam.list
+	curl --proto '=https' --tlsv1.3 -sSf 'https://packages.mozilla.org/apt/repo-signing-key.gpg' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mozilla.gpg
+	printf '%s\n' 'deb [signed-by=/etc/apt/trusted.gpg.d/mozilla.gpg] https://packages.mozilla.org/apt mozilla main' > /etc/apt/sources.list.d/mozilla.list
 EOF
 
 # Install extra packages
