@@ -1,3 +1,6 @@
+# syntax=docker.io/docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv
+
 m4_changequote([[, ]])
 
 ##################################################
@@ -83,7 +86,7 @@ RUN <<-EOF
 EOF
 
 # Build libjpeg-turbo
-ARG LIBJPEG_TURBO_TREEISH=3.1.1
+ARG LIBJPEG_TURBO_TREEISH=3.1.3
 ARG LIBJPEG_TURBO_REMOTE=https://github.com/libjpeg-turbo/libjpeg-turbo.git
 WORKDIR /tmp/libjpeg-turbo/
 RUN <<-EOF
@@ -104,7 +107,7 @@ RUN <<-EOF
 EOF
 
 # Build VirtualGL
-ARG VIRTUALGL_TREEISH=3.1.3
+ARG VIRTUALGL_TREEISH=3.1.4
 ARG VIRTUALGL_REMOTE=https://github.com/VirtualGL/virtualgl.git
 WORKDIR /tmp/virtualgl/
 RUN <<-EOF
@@ -126,7 +129,7 @@ RUN <<-EOF
 EOF
 
 # Build TurboVNC
-ARG TURBOVNC_TREEISH=3.2
+ARG TURBOVNC_TREEISH=3.2.1
 ARG TURBOVNC_REMOTE=https://github.com/TurboVNC/turbovnc.git
 WORKDIR /tmp/turbovnc/
 RUN <<-EOF
@@ -156,7 +159,7 @@ RUN <<-EOF
 EOF
 
 # Build xrdp
-ARG XRDP_TREEISH=v0.10.3
+ARG XRDP_TREEISH=v0.10.4.1
 ARG XRDP_REMOTE=https://github.com/neutrinolabs/xrdp.git
 WORKDIR /tmp/xrdp/
 RUN <<-EOF
@@ -332,15 +335,15 @@ m4_ifelse(ENABLE_INTEL_SUPPORT, 1, [[m4_dnl
 m4_ifelse(ENABLE_NVIDIA_SUPPORT, 1, [[m4_dnl
 	apt-get install -y --no-install-recommends -o APT::Immediate-Configure=0 \
 		libdrm-nouveau2 \
-		libnvidia-cfg1-570 \
-		libnvidia-compute-570 \
-		libnvidia-decode-570 \
-		libnvidia-encode-570 \
-		libnvidia-extra-570 \
-		libnvidia-fbc1-570 \
-		libnvidia-gl-570 \
+		libnvidia-cfg1-580 \
+		libnvidia-compute-580 \
+		libnvidia-decode-580 \
+		libnvidia-encode-580 \
+		libnvidia-extra-580 \
+		libnvidia-fbc1-580 \
+		libnvidia-gl-580 \
 		xserver-xorg-video-nouveau \
-		xserver-xorg-video-nvidia-570
+		xserver-xorg-video-nvidia-580
 ]])m4_dnl
 	rm -rf /var/lib/apt/lists/*
 	rm -f /etc/ssh/ssh_host_*_key
