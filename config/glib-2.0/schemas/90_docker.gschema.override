@@ -1,0 +1,8 @@
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+gtk-theme='Greybird-dark'
+icon-theme='elementary-xfce-dark'
+toolkit-accessibility=true
+
+[org.xfce.mousepad.preferences.view]
+color-scheme='xubuntu_dark'

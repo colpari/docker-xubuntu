@@ -7,7 +7,7 @@ m4_changequote([[, ]])
 ## "build" stage
 ##################################################
 
-m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:24.04]], [[FROM docker.io/ubuntu:24.04]]) AS build
+m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:26.04]], [[FROM docker.io/ubuntu:26.04]]) AS build
 
 SHELL ["/bin/sh", "-euc"]
 
@@ -86,13 +86,11 @@ RUN <<-EOF
 EOF
 
 # Build libjpeg-turbo
-ARG LIBJPEG_TURBO_TREEISH=3.1.3
+ARG LIBJPEG_TURBO_TREEISH=3.2.0
 ARG LIBJPEG_TURBO_REMOTE=https://github.com/libjpeg-turbo/libjpeg-turbo.git
 WORKDIR /tmp/libjpeg-turbo/
 RUN <<-EOF
-	git clone "${LIBJPEG_TURBO_REMOTE:?}" ./
-	git checkout "${LIBJPEG_TURBO_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${LIBJPEG_TURBO_TREEISH:?}" --recurse-submodules --shallow-submodules "${LIBJPEG_TURBO_REMOTE:?}" ./
 EOF
 WORKDIR /tmp/libjpeg-turbo/build/
 RUN <<-EOF
@@ -107,13 +105,11 @@ RUN <<-EOF
 EOF
 
 # Build VirtualGL
-ARG VIRTUALGL_TREEISH=3.1.4
+ARG VIRTUALGL_TREEISH=3.1.5
 ARG VIRTUALGL_REMOTE=https://github.com/VirtualGL/virtualgl.git
 WORKDIR /tmp/virtualgl/
 RUN <<-EOF
-	git clone "${VIRTUALGL_REMOTE:?}" ./
-	git checkout "${VIRTUALGL_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${VIRTUALGL_TREEISH:?}" --recurse-submodules --shallow-submodules "${VIRTUALGL_REMOTE:?}" ./
 EOF
 WORKDIR /tmp/virtualgl/build/
 RUN <<-EOF
@@ -129,13 +125,11 @@ RUN <<-EOF
 EOF
 
 # Build TurboVNC
-ARG TURBOVNC_TREEISH=3.2.1
+ARG TURBOVNC_TREEISH=3.3.1
 ARG TURBOVNC_REMOTE=https://github.com/TurboVNC/turbovnc.git
 WORKDIR /tmp/turbovnc/
 RUN <<-EOF
-	git clone "${TURBOVNC_REMOTE:?}" ./
-	git checkout "${TURBOVNC_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${TURBOVNC_TREEISH:?}" --recurse-submodules --shallow-submodules "${TURBOVNC_REMOTE:?}" ./
 EOF
 WORKDIR /tmp/turbovnc/build/
 RUN <<-EOF
@@ -154,18 +148,17 @@ RUN <<-EOF
 		-D TVNC_USEPAM=1 \
 		-D TVNC_GLX=1 \
 		-D TVNC_NVCONTROL=1 \
+		-D XORG_DRI_DRIVER_PATH="/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/dri" \
 		../
 	make -j"$(nproc)" install
 EOF
 
 # Build xrdp
-ARG XRDP_TREEISH=v0.10.4.1
+ARG XRDP_TREEISH=v0.10.6.1
 ARG XRDP_REMOTE=https://github.com/neutrinolabs/xrdp.git
 WORKDIR /tmp/xrdp/
 RUN <<-EOF
-	git clone "${XRDP_REMOTE:?}" ./
-	git checkout "${XRDP_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${XRDP_TREEISH:?}" --recurse-submodules --shallow-submodules "${XRDP_REMOTE:?}" ./
 EOF
 RUN <<-EOF
 	./bootstrap
@@ -191,13 +184,11 @@ RUN <<-EOF
 EOF
 
 # Build xorgxrdp
-ARG XORGXRDP_TREEISH=v0.10.4
+ARG XORGXRDP_TREEISH=v0.10.5
 ARG XORGXRDP_REMOTE=https://github.com/neutrinolabs/xorgxrdp.git
 WORKDIR /tmp/xorgxrdp/
 RUN <<-EOF
-	git clone "${XORGXRDP_REMOTE:?}" ./
-	git checkout "${XORGXRDP_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${XORGXRDP_TREEISH:?}" --recurse-submodules --shallow-submodules "${XORGXRDP_REMOTE:?}" ./
 EOF
 RUN <<-EOF
 	./bootstrap
@@ -220,34 +211,54 @@ RUN <<-EOF
 EOF
 WORKDIR /tmp/pulseaudio-module-xrdp/
 RUN <<-EOF
-	git clone "${XRDP_PULSEAUDIO_REMOTE:?}" ./
-	git checkout "${XRDP_PULSEAUDIO_TREEISH:?}"
-	git submodule update --init --recursive
+	git clone --depth 1 --revision="${XRDP_PULSEAUDIO_TREEISH:?}" --recurse-submodules --shallow-submodules "${XRDP_PULSEAUDIO_REMOTE:?}" ./
 EOF
 RUN <<-EOF
 	./bootstrap
 	./configure \
 		--prefix=/opt/xrdp \
 		--with-module-dir=/opt/xrdp/lib/pulse/modules \
+		--with-xdgautostart-dir=/opt/xrdp/etc/xdg/autostart \
 		PKG_CONFIG_PATH=/opt/xrdp/lib/pkgconfig \
 		PULSE_DIR=/tmp/pulseaudio/
 	make -j"$(nproc)" install
+EOF
+
+# Build noVNC
+ARG NOVNC_TREEISH=v1.7.0
+ARG NOVNC_REMOTE=https://github.com/novnc/noVNC.git
+WORKDIR /tmp/novnc/
+RUN <<-EOF
+	git clone --depth 1 --revision="${NOVNC_TREEISH:?}" --recurse-submodules --shallow-submodules "${NOVNC_REMOTE:?}" ./
+EOF
+RUN <<-EOF
+	mkdir /opt/noVNC/
+	cp -a ./app/ ./core/ ./vendor/ ./vnc.html ./vnc_lite.html ./defaults.json ./mandatory.json ./package.json /opt/noVNC/
+	ln -s ./vnc.html /opt/noVNC/index.html
+EOF
+
+# Build websockify
+ARG WEBSOCKIFY_TREEISH=v0.13.0
+ARG WEBSOCKIFY_REMOTE=https://github.com/novnc/websockify.git
+WORKDIR /tmp/websockify/
+RUN <<-EOF
+	git clone --depth 1 --revision="${WEBSOCKIFY_TREEISH:?}" --recurse-submodules --shallow-submodules "${WEBSOCKIFY_REMOTE:?}" ./
+EOF
+RUN <<-EOF
+	mkdir /opt/websockify/
+	cp -a ./websockify/ /opt/websockify/
 EOF
 
 ##################################################
 ## "main" stage
 ##################################################
 
-m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:24.04]], [[FROM docker.io/ubuntu:24.04]]) AS main
+m4_ifdef([[CROSS_ARCH]], [[FROM docker.io/CROSS_ARCH/ubuntu:26.04]], [[FROM docker.io/ubuntu:26.04]]) AS main
 
 SHELL ["/bin/sh", "-euc"]
 
 # Copy APT config
-COPY --chown=root:root ./config/apt/preferences.d/ /etc/apt/preferences.d/
-RUN <<-EOF
-	find /etc/apt/preferences.d/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /etc/apt/preferences.d/ -type f -not -perm 0644 -exec chmod 0644 '{}' ';'
-EOF
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/apt/preferences.d/ /etc/apt/preferences.d/
 
 # Install base packages
 RUN <<-EOF
@@ -266,7 +277,7 @@ RUN <<-EOF
 		libepoxy0 \
 		libfdk-aac2 \
 		libfreetype6 \
-		libfuse3-3 \
+		libfuse3-4 \
 		libgbm1 \
 		libgl1 \
 		libgl1-mesa-dri \
@@ -284,13 +295,13 @@ RUN <<-EOF
 		libsystemd0 \
 		libx11-6 \
 		libx11-xcb1 \
-		libx264-164 \
+		libx264-165 \
 		libxcb-glx0 \
 		libxcb-keysyms1 \
 		libxcb1 \
 		libxext6 \
 		libxfixes3 \
-		libxml2 \
+		libxml2-16 \
 		libxrandr2 \
 		libxshmfence1 \
 		libxt6t64 \
@@ -302,12 +313,14 @@ RUN <<-EOF
 		mesa-va-drivers \
 		mesa-vdpau-drivers \
 		mesa-vulkan-drivers \
-		ocl-icd-opencl-dev \
+		ocl-icd-libopencl1 \
 		openssh-server \
 		openssl \
 		perl-base \
-		policykit-1 \
+		pkexec \
+		polkitd \
 		pulseaudio \
+		python3 \
 		runit \
 		tzdata \
 		udev \
@@ -319,7 +332,6 @@ RUN <<-EOF
 		xserver-xorg-input-libinput \
 		xserver-xorg-video-dummy \
 		xserver-xorg-video-fbdev \
-		xserver-xorg-video-vesa \
 		zlib1g
 m4_ifelse(ENABLE_AMD_SUPPORT, 1, [[m4_dnl
 	apt-get install -y --no-install-recommends -o APT::Immediate-Configure=0 \
@@ -333,27 +345,26 @@ m4_ifelse(ENABLE_INTEL_SUPPORT, 1, [[m4_dnl
 		xserver-xorg-video-intel
 ]])m4_dnl
 m4_ifelse(ENABLE_NVIDIA_SUPPORT, 1, [[m4_dnl
+	nvidia_branch="$(apt-cache pkgnames libnvidia-gl- | grep -Eo '[0-9]+$' | sort -n | tail -1)"
 	apt-get install -y --no-install-recommends -o APT::Immediate-Configure=0 \
 		libdrm-nouveau2 \
-		libnvidia-cfg1-580 \
-		libnvidia-compute-580 \
-		libnvidia-decode-580 \
-		libnvidia-encode-580 \
-		libnvidia-extra-580 \
-		libnvidia-fbc1-580 \
-		libnvidia-gl-580 \
+		libnvidia-cfg1-"${nvidia_branch:?}" \
+		libnvidia-compute-"${nvidia_branch:?}" \
+		libnvidia-decode-"${nvidia_branch:?}" \
+		libnvidia-encode-"${nvidia_branch:?}" \
+		libnvidia-extra-"${nvidia_branch:?}" \
+		libnvidia-fbc1-"${nvidia_branch:?}" \
+		libnvidia-gl-"${nvidia_branch:?}" \
 		xserver-xorg-video-nouveau \
-		xserver-xorg-video-nvidia-580
+		xserver-xorg-video-nvidia-"${nvidia_branch:?}"
 ]])m4_dnl
 	rm -rf /var/lib/apt/lists/*
-	rm -f /etc/ssh/ssh_host_*_key
+	rm -f /etc/ssh/ssh_host_*
 EOF
 
 # Add Mozilla repository
-RUN <<-EOF
-	curl --proto '=https' --tlsv1.3 -sSf 'https://packages.mozilla.org/apt/repo-signing-key.gpg' | gpg --dearmor -o /etc/apt/trusted.gpg.d/mozilla.gpg
-	printf '%s\n' 'deb [signed-by=/etc/apt/trusted.gpg.d/mozilla.gpg] https://packages.mozilla.org/apt mozilla main' > /etc/apt/sources.list.d/mozilla.list
-EOF
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/apt/keyrings/ /etc/apt/keyrings/
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/apt/sources.list.d/ /etc/apt/sources.list.d/
 
 # Install extra packages
 RUN <<-EOF
@@ -376,9 +387,12 @@ RUN <<-EOF
 		fonts-dejavu \
 		fonts-liberation \
 		fonts-noto \
+		fonts-noto-cjk \
 		fonts-noto-color-emoji \
+		fonts-noto-mono \
 		fonts-ubuntu \
 		fuse3 \
+		gir1.2-atspi-2.0 \
 		git \
 		gnome-keyring \
 		gtk2-engines-pixbuf \
@@ -388,9 +402,10 @@ RUN <<-EOF
 		iproute2 \
 		iputils-ping \
 		libavcodec-extra \
-		libcanberra-gtk-module \
 		libcanberra-gtk3-module \
+		libglib2.0-bin \
 		libgtk-3-bin \
+		libpam-gnome-keyring \
 		librsvg2-common \
 		lshw \
 		lsof \
@@ -413,6 +428,8 @@ RUN <<-EOF
 		psmisc \
 		pulseaudio-utils \
 		ristretto \
+		scrot \
+		seahorse \
 		strace \
 		sudo \
 		thunar-archive-plugin \
@@ -421,16 +438,22 @@ RUN <<-EOF
 		usbutils \
 		vulkan-tools \
 		wget \
+		wmctrl \
 		x11-utils \
 		x11-xkb-utils \
 		xauth \
+		xclip \
+		xdg-desktop-portal \
+		xdg-desktop-portal-gtk \
 		xdg-user-dirs \
 		xdg-utils \
+		xdotool \
 		xfce4 \
 		xfce4-indicator-plugin \
 		xfce4-notifyd \
 		xfce4-panel \
 		xfce4-panel-profiles \
+		xfce4-power-manager-plugins \
 		xfce4-pulseaudio-plugin \
 		xfce4-screenshooter \
 		xfce4-taskmanager \
@@ -441,6 +464,7 @@ RUN <<-EOF
 		xterm \
 		xubuntu-default-settings \
 		xutils \
+		xvfb \
 		xz-utils \
 		zenity \
 		zip
@@ -458,6 +482,17 @@ COPY --from=build /opt/TurboVNC/ /opt/TurboVNC/
 
 # Copy xrdp, xorgxrdp and PulseAudio module builds
 COPY --from=build /opt/xrdp/ /opt/xrdp/
+RUN <<-EOF
+	pulse_module_dir="$(pulseaudio --dump-conf | sed -n 's/^dl-search-path = //p')"
+	test -d "${pulse_module_dir:?}"
+	ln -sv /opt/xrdp/lib/pulse/modules/module-xrdp-sink.so "${pulse_module_dir:?}/module-xrdp-sink.so"
+	ln -sv /opt/xrdp/lib/pulse/modules/module-xrdp-source.so "${pulse_module_dir:?}/module-xrdp-source.so"
+	ln -sv /opt/xrdp/etc/xdg/autostart/pulseaudio-xrdp.desktop /etc/xdg/autostart/pulseaudio-xrdp.desktop
+EOF
+
+# Copy noVNC and websockify builds
+COPY --from=build /opt/noVNC/ /opt/noVNC/
+COPY --from=build /opt/websockify/ /opt/websockify/
 
 # Environment
 ENV SVDIR=/etc/service/
@@ -469,20 +504,23 @@ ENV UNPRIVILEGED_USER_NAME=user
 ENV UNPRIVILEGED_USER_PASSWORD=password
 ENV UNPRIVILEGED_USER_GROUPS=
 ENV UNPRIVILEGED_USER_SHELL=/bin/bash
-ENV UNPRIVILEGED_USER_HOME=/home/user
+ENV UNPRIVILEGED_USER_HOME=
 ENV SERVICE_XRDP_BOOTSTRAP_ENABLED=false
 ENV SERVICE_XORG_HEADLESS_ENABLED=false
+ENV SERVICE_NOVNC_ENABLED=false
 ENV XRDP_RSAKEYS_PATH=/etc/xrdp/rsakeys.ini
 ENV XRDP_TLS_KEY_PATH=/etc/xrdp/key.pem
 ENV XRDP_TLS_CRT_PATH=/etc/xrdp/cert.pem
 ENV STARTUP=xfce4-session
 ENV DESKTOP_SESSION=xubuntu
-ENV QT_STYLE_OVERRIDE=Adwaita
+ENV QT_STYLE_OVERRIDE=Adwaita-Dark
+ENV MOZ_CRASHREPORTER_DISABLE=1
 
 # Setup locale
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 RUN <<-EOF
 	printf '%s\n' "${LANG:?} UTF-8" > /etc/locale.gen
+	printf '%s\n' "LANG=${LANG:?}" > /etc/default/locale
 	localedef -c -i "${LANG%%.*}" -f UTF-8 "${LANG:?}" ||:
 EOF
 
@@ -495,26 +533,15 @@ EOF
 
 # Setup D-Bus
 RUN <<-EOF
-	dbus-uuidgen > /etc/machine-id
+	: > /etc/machine-id
 	ln -sf /etc/machine-id /var/lib/dbus/machine-id
-EOF
-
-# Make sesman read environment variables
-RUN <<-EOF
-	printf '%s\n' 'session required pam_env.so readenv=1' >> /etc/pam.d/xrdp-sesman
+	find /usr/share/dbus-1/system-services/ -type f -name '*.service' -exec grep -qx 'Exec=/bin/false' '{}' ';' -print -delete
 EOF
 
 # Remove default user and group
 RUN <<-EOF
 	if id -u "${UNPRIVILEGED_USER_UID:?}" >/dev/null 2>&1; then userdel -f "$(id -nu "${UNPRIVILEGED_USER_UID:?}")"; fi
-	if id -g "${UNPRIVILEGED_USER_GID:?}" >/dev/null 2>&1; then groupdel "$(id -nu "${UNPRIVILEGED_USER_GID:?}")"; fi
-EOF
-
-# Create symlinks for xrdp RSA keys and TLS certificates
-RUN <<-EOF
-	ln -svf "${XRDP_RSAKEYS_PATH:?}" /opt/xrdp/etc/xrdp/rsakeys.ini
-	ln -svf "${XRDP_TLS_KEY_PATH:?}" /opt/xrdp/etc/xrdp/key.pem
-	ln -svf "${XRDP_TLS_CRT_PATH:?}" /opt/xrdp/etc/xrdp/cert.pem
+	if getent group "${UNPRIVILEGED_USER_GID:?}" >/dev/null 2>&1; then groupdel "$(getent group "${UNPRIVILEGED_USER_GID:?}" | cut -d: -f1)"; fi
 EOF
 
 # Forward logs to Docker log collector
@@ -525,56 +552,66 @@ RUN <<-EOF
 EOF
 
 # Copy and enable services
-COPY --chown=root:root ./scripts/service/ /etc/sv/
+COPY --chown=root:root --chmod=0755 ./scripts/service/ /etc/sv/
 RUN <<-EOF
-	find /etc/sv/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /etc/sv/ -type f -not -perm 0755 -exec chmod 0755 '{}' ';'
 	ln -sv /etc/sv/dbus-daemon "${SVDIR:?}"
 	ln -sv /etc/sv/sshd "${SVDIR:?}"
-	ln -sv /etc/sv/udevadm-trigger "${SVDIR:?}"
-	ln -sv /etc/sv/udevd "${SVDIR:?}"
 	ln -sv /etc/sv/xrdp "${SVDIR:?}"
 	ln -sv /etc/sv/xrdp-sesman "${SVDIR:?}"
 EOF
 
+# Copy PAM config
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/pam.d/ /etc/pam.d/
+
 # Copy SSH config
-COPY --chown=root:root ./config/ssh/ /etc/ssh/
-RUN <<-EOF
-	find /etc/ssh/sshd_config -type f -not -perm 0644 -exec chmod 0644 '{}' ';'
-EOF
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/ssh/ /etc/ssh/
 
 # Copy X11 config
-COPY --chown=root:root ./config/X11/ /etc/X11/
-RUN <<-EOF
-	find /etc/X11/xorg.conf.d/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /etc/X11/xorg.conf.d/ -type f -not -perm 0644 -exec chmod 0644 '{}' ';'
-EOF
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/X11/ /etc/X11/
 
 # Copy xrdp config
-COPY --chown=root:root ./config/xrdp/ /opt/xrdp/etc/xrdp/
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/xrdp/ /opt/xrdp/etc/xrdp/
+
+# Copy XDG config
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/xdg/ /etc/xdg/
+
+# Copy GSettings schema overrides
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/glib-2.0/schemas/ /usr/share/glib-2.0/schemas/
 RUN <<-EOF
-	find /opt/xrdp/etc/xrdp/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /opt/xrdp/etc/xrdp/ -type f -not -perm 0644 -exec chmod 0644 '{}' ';'
-	find /opt/xrdp/etc/xrdp/ -type f -name '*.sh' -not -perm 0755 -exec chmod 0755 '{}' ';'
+	glib-compile-schemas /usr/share/glib-2.0/schemas/
 EOF
+
+# Add GTK 4 support to Greybird-dark theme
+RUN <<-EOF
+	mkdir /usr/share/themes/Greybird-dark/gtk-4.0/
+	test -f /usr/share/themes/Greybird/gtk-4.0/gtk-dark.css
+	printf '%s\n' '@import url("file:///usr/share/themes/Greybird/gtk-4.0/gtk-dark.css");' > /usr/share/themes/Greybird-dark/gtk-4.0/gtk.css
+EOF
+
+# Update Whisker Menu favorites
+RUN <<-EOF
+	mkdir -p /etc/xdg/xdg-docker/xfce4/whiskermenu/
+	sed 's|^favorites=.*$|favorites=xfce4-web-browser.desktop,xfce4-file-manager.desktop,xfce4-terminal-emulator.desktop|' \
+		/etc/xdg/xdg-xubuntu/xfce4/whiskermenu/defaults.rc > /etc/xdg/xdg-docker/xfce4/whiskermenu/defaults.rc
+EOF
+
+# Copy TurboVNC config
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/turbovnc/ /opt/TurboVNC/etc/
 
 # Copy PulseAudio config
-COPY --chown=root:root ./config/pulse/ /etc/pulse/
-RUN <<-EOF
-	find /etc/pulse/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /etc/pulse/ -type f -not -perm 0644 -exec chmod 0644 '{}' ';'
-EOF
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/pulse/ /etc/pulse/
+
+# Copy Firefox config
+COPY --chown=root:root --chmod=a+rX,u+w,go-w ./config/firefox/ /etc/firefox/
 
 # Copy scripts
-COPY --chown=root:root ./scripts/bin/ /usr/local/bin/
-RUN <<-EOF
-	find /usr/local/bin/ -type d -not -perm 0755 -exec chmod 0755 '{}' ';'
-	find /usr/local/bin/ -type f -not -perm 0755 -exec chmod 0755 '{}' ';'
-EOF
+COPY --chown=root:root --chmod=0755 ./scripts/bin/ /usr/local/bin/
 
 # SSH
 EXPOSE 3322/tcp
 # RDP
 EXPOSE 3389/tcp
+# noVNC
+EXPOSE 6080/tcp
 
-ENTRYPOINT ["/usr/bin/catatonit", "--", "/usr/local/bin/container-init"]
+ENTRYPOINT ["/usr/bin/catatonit", "-g", "--", "/usr/local/bin/container-init"]

@@ -2,13 +2,22 @@
 
 set -eu
 
+# Default unprivileged user home to /home/${UNPRIVILEGED_USER_NAME}
+export UNPRIVILEGED_USER_HOME="${UNPRIVILEGED_USER_HOME:-/home/${UNPRIVILEGED_USER_NAME:?}}"
+
 # Remove leftover files
-find /tmp/ /run/ -mindepth 1 -delete ||:
+find /tmp/ /run/ -mindepth 1 -xdev -delete ||:
+
+# Generate machine ID if it does not exist
+if [ ! -s /etc/machine-id ]; then
+	dbus-uuidgen > /etc/machine-id
+fi
 
 # Add GPU devices groups to additional groups
 for dev in /dev/dri/*; do
 	[ -c "${dev:?}" ] || continue
 	gid=$(stat -c '%g' "${dev:?}")
+	[ "${gid:?}" -ne 0 ] || continue
 	uug=${UNPRIVILEGED_USER_GROUPS?}
 	UNPRIVILEGED_USER_GROUPS="${uug:+${uug:?},}${gid:?}"
 done
@@ -33,28 +42,59 @@ if ! getent passwd "${UNPRIVILEGED_USER_UID:?}" >/dev/null 2>&1; then
 		--groups "${UNPRIVILEGED_USER_GROUPS?}" \
 		--shell "${UNPRIVILEGED_USER_SHELL:?}" \
 		--home-dir "${UNPRIVILEGED_USER_HOME:?}" \
-		--create-home \
+		--no-create-home \
 		"${UNPRIVILEGED_USER_NAME:?}"
 fi
 
+# Create xrdp runtime user and group
+if ! getent passwd xrdp >/dev/null 2>&1; then
+	useradd \
+		--system \
+		--user-group \
+		--shell /usr/sbin/nologin \
+		--home-dir /nonexistent \
+		--no-create-home \
+		--comment 'xrdp daemon' \
+		xrdp
+fi
+
 # Set unprivileged user password
-if [ -n "${UNPRIVILEGED_USER_PASSWORD?}" ]; then
-	printf '%s' "${UNPRIVILEGED_USER_NAME:?}:${UNPRIVILEGED_USER_PASSWORD:?}" | chpasswd
+if ! printenv UNPRIVILEGED_USER_PASSWORD >/dev/null; then
+	printf '%s\n' 'UNPRIVILEGED_USER_PASSWORD is not set' 1>&2
+	exit 1
+fi
+if [ -n "${UNPRIVILEGED_USER_PASSWORD:+x}" ]; then
+	{ printf '%s:' "${UNPRIVILEGED_USER_NAME:?}"; printenv UNPRIVILEGED_USER_PASSWORD; } | chpasswd
 else
 	passwd -d "${UNPRIVILEGED_USER_NAME:?}"
 fi
+unset UNPRIVILEGED_USER_PASSWORD
+
+# Create unprivileged user home if it does not exist
+if [ ! -e "${UNPRIVILEGED_USER_HOME:?}" ]; then
+	mkdir -p "${UNPRIVILEGED_USER_HOME:?}"
+fi
 
 if [ -w "${UNPRIVILEGED_USER_HOME:?}" ]; then
+	# Set unprivileged user home owner
+	if [ "$(stat -c '%u' "${UNPRIVILEGED_USER_HOME:?}")" != "${UNPRIVILEGED_USER_UID:?}" ]; then
+		chown "${UNPRIVILEGED_USER_NAME:?}:${UNPRIVILEGED_USER_GID:?}" "${UNPRIVILEGED_USER_HOME:?}"
+	fi
+
 	# Copy /etc/skel/ to unprivileged user home if certain files do not exist
 	if [ ! -e "${UNPRIVILEGED_USER_HOME:?}"/.profile ]; then
-		cp -aT /etc/skel/ "${UNPRIVILEGED_USER_HOME:?}" ||:
-		find /etc/skel/ -mindepth 1 -exec sh -c 'chown "$1:" "$2/${3#/etc/skel/}"' _ "${UNPRIVILEGED_USER_NAME:?}" "${UNPRIVILEGED_USER_HOME:?}" '{}' ';'
+		setpriv --reuid="${UNPRIVILEGED_USER_UID:?}" --regid="${UNPRIVILEGED_USER_GID:?}" --init-groups \
+			cp -aT --remove-destination /etc/skel/ "${UNPRIVILEGED_USER_HOME:?}" ||:
+	fi
+
+	# Create an empty Xauthority file if it does not exist
+	if [ ! -e "${UNPRIVILEGED_USER_HOME:?}"/.Xauthority ]; then
+		# shellcheck disable=SC2016
+		setpriv --reuid="${UNPRIVILEGED_USER_UID:?}" --regid="${UNPRIVILEGED_USER_GID:?}" --init-groups \
+			sh -c 'rm -f "$1" && install -m 600 /dev/null "$1"' _ "${UNPRIVILEGED_USER_HOME:?}"/.Xauthority
 	fi
 
 	# Set unprivileged user home permissions
-	if [ "$(stat -c '%u' "${UNPRIVILEGED_USER_HOME:?}")" != "${UNPRIVILEGED_USER_UID:?}" ]; then
-		chown "${UNPRIVILEGED_USER_NAME:?}:" "${UNPRIVILEGED_USER_HOME:?}"
-	fi
 	if [ "$(stat -c '%a' "${UNPRIVILEGED_USER_HOME:?}")" != '750' ]; then
 		chmod 750 "${UNPRIVILEGED_USER_HOME:?}"
 	fi
@@ -64,23 +104,59 @@ fi
 if [ ! -d /run/user/"${UNPRIVILEGED_USER_UID:?}"/ ]; then
 	mkdir -p /run/user/"${UNPRIVILEGED_USER_UID:?}"/
 	chmod 700 /run/user/"${UNPRIVILEGED_USER_UID:?}"/
-	chown "${UNPRIVILEGED_USER_NAME:?}:" /run/user/"${UNPRIVILEGED_USER_UID:?}"/
+	chown "${UNPRIVILEGED_USER_NAME:?}:${UNPRIVILEGED_USER_GID:?}" /run/user/"${UNPRIVILEGED_USER_UID:?}"/
 fi
 
-# Disable glx module if /dev/dri/ does not exist
+# Disable glx module and GLX extension in Xvnc sessions if /dev/dri/ does not exist
 if [ ! -d /dev/dri/ ]; then
 	printf '%s\n' '"/dev/dri/" does not exist, glx module will be disabled' 1>&2
 	sed -i 's|Load \("glx"\)|Disable \1|g' /opt/xrdp/etc/X11/xrdp/xorg.conf
+	if grep -qx 'param=+extension' /opt/xrdp/etc/xrdp/sesman.ini; then
+		sed -i 's|^param=+extension$|param=-extension|' /opt/xrdp/etc/xrdp/sesman.ini
+	fi
+fi
+
+# Use for DRI3 in Xvnc sessions the first DRM render node that the unprivileged user can open, or disable it if none
+dri_allowlist=$(sed -n 's/^[[:space:]]*Option[[:space:]]*"DRMAllowList"[[:space:]]*"\([^"]*\)".*/\1/p' /opt/xrdp/etc/X11/xrdp/xorg.conf)
+dri3_node=; for node in /dev/dri/renderD*; do
+	[ -c "${node:?}" ] || continue
+	driver=$(readlink -f /sys/class/drm/"${node##*/}"/device/driver 2>/dev/null) || continue
+	case " ${dri_allowlist?} " in *" ${driver##*/} "*) ;; *) continue ;; esac
+	# shellcheck disable=SC2016
+	if setpriv --reuid="${UNPRIVILEGED_USER_UID:?}" --regid="${UNPRIVILEGED_USER_GID:?}" --init-groups \
+		sh -c 'exec 3<>"$1"' _ "${node:?}" 2>/dev/null; then
+		dri3_node=${node:?}
+		break
+	fi
+done
+if [ -z "${dri3_node?}" ]; then
+	printf '%s\n' 'No accessible DRM render node with a supported driver exists, DRI3 will be disabled in Xvnc sessions' 1>&2
+	if grep -qx 'param=-drinode' /opt/xrdp/etc/xrdp/sesman.ini; then
+		sed -i '/^param=-drinode$/{N;d}' /opt/xrdp/etc/xrdp/sesman.ini
+	fi
+elif grep -qx 'param=-drinode' /opt/xrdp/etc/xrdp/sesman.ini; then
+	sed -i "/^param=-drinode\$/{n;s|^param=.*\$|param=${dri3_node:?}|}" /opt/xrdp/etc/xrdp/sesman.ini
 fi
 
 # Enable xrdp bootstrap service
-if [ "${SERVICE_XRDP_BOOTSTRAP_ENABLED:?}" = 'true' ] && [ ! -L "${SVDIR:?}"/xrdp-bootstrap ]; then
+if [ "${SERVICE_XRDP_BOOTSTRAP_ENABLED:-}" = 'true' ] && [ ! -L "${SVDIR:?}"/xrdp-bootstrap ]; then
 	ln -s /etc/sv/xrdp-bootstrap "${SVDIR:?}"
 fi
 
 # Enable headless X server service
-if [ "${SERVICE_XORG_HEADLESS_ENABLED:?}" = 'true' ] && [ ! -L "${SVDIR:?}"/xorg-headless ]; then
+if [ "${SERVICE_XORG_HEADLESS_ENABLED:-}" = 'true' ] && [ ! -L "${SVDIR:?}"/xorg-headless ]; then
 	ln -s /etc/sv/xorg-headless "${SVDIR:?}"
+fi
+
+# Enable noVNC service
+if [ "${SERVICE_NOVNC_ENABLED:-}" = 'true' ] && [ ! -L "${SVDIR:?}"/novnc ]; then
+	ln -s /etc/sv/novnc "${SVDIR:?}"
+fi
+
+# Enable udev services if sysfs is writable
+if [ -w /sys/ ] && [ ! -L "${SVDIR:?}"/udevd ]; then
+	ln -s /etc/sv/udevd "${SVDIR:?}"
+	ln -s /etc/sv/udevadm-trigger "${SVDIR:?}"
 fi
 
 # Generate SSH keys if they do not exist
@@ -97,29 +173,64 @@ if [ ! -f "${XRDP_RSAKEYS_PATH:?}" ]; then
 	(umask 077 \
 		&& xrdp-keygen xrdp "${XRDP_RSAKEYS_PATH:?}" \
 	) >/dev/null
+	chgrp xrdp "${XRDP_RSAKEYS_PATH:?}"
+	chmod 640 "${XRDP_RSAKEYS_PATH:?}"
 fi
 
 # Generate RDP certificate if it does not exist
 if [ ! -f "${XRDP_TLS_KEY_PATH:?}" ] || [ ! -f "${XRDP_TLS_CRT_PATH:?}" ]; then
 	FQDN=$(hostname --fqdn)
+	CN=$(printf '%.64s' "${FQDN:?}")
 
 	mkdir -p "$(dirname "${XRDP_TLS_KEY_PATH:?}")"
 	(umask 077 \
 		&& openssl ecparam -genkey -name prime256v1 > "${XRDP_TLS_KEY_PATH:?}" \
 	) >/dev/null
+	chgrp xrdp "${XRDP_TLS_KEY_PATH:?}"
+	chmod 640 "${XRDP_TLS_KEY_PATH:?}"
 
 	mkdir -p "$(dirname "${XRDP_TLS_CRT_PATH:?}")"
 	(umask 022 \
-		&& openssl req -x509 -sha256 -days 3650 -subj "/CN=${FQDN:?}" -addext "subjectAltName=DNS:${FQDN:?}" -key "${XRDP_TLS_KEY_PATH:?}" > "${XRDP_TLS_CRT_PATH:?}" \
+		&& openssl req -x509 -sha256 -days 3650 -subj "/CN=${CN:?}" -addext "subjectAltName=DNS:${FQDN:?}" -key "${XRDP_TLS_KEY_PATH:?}" > "${XRDP_TLS_CRT_PATH:?}" \
 	) >/dev/null
 fi
+
+# Create symlinks for xrdp RSA keys and TLS certificates
+ln -sf "${XRDP_RSAKEYS_PATH:?}" /opt/xrdp/etc/xrdp/rsakeys.ini
+ln -sf "${XRDP_TLS_KEY_PATH:?}" /opt/xrdp/etc/xrdp/key.pem
+ln -sf "${XRDP_TLS_CRT_PATH:?}" /opt/xrdp/etc/xrdp/cert.pem
+
+# Run xrdp as root if the xrdp user cannot read the RDP keys
+for file in "${XRDP_RSAKEYS_PATH:?}" "${XRDP_TLS_KEY_PATH:?}" "${XRDP_TLS_CRT_PATH:?}"; do
+	if ! setpriv --reuid=xrdp --regid=xrdp --init-groups test -r "${file:?}"; then
+		printf '%s\n' "\"${file:?}\" is not readable by the xrdp user, xrdp will run as root" 1>&2
+		sed -i '/^runtime_\(user\|group\)=/d' /opt/xrdp/etc/xrdp/xrdp.ini
+		sed -i '/^SessionSockdirGroup=/d' /opt/xrdp/etc/xrdp/sesman.ini
+		break
+	fi
+done
 
 # Print RDP certificate fingerprint
 openssl x509 -in "${XRDP_TLS_CRT_PATH:?}" -noout -fingerprint -sha1
 openssl x509 -in "${XRDP_TLS_CRT_PATH:?}" -noout -fingerprint -sha256
 
 # Dump environment variables
-env | grep -Ev '^(PWD|OLDPWD|HOME|USER|SHELL|TERM|([^=]*(PASSWORD|SECRET)[^=]*))=' | sort > /etc/environment
+env -0 | grep -zPv '^(PWD|OLDPWD|HOME|USER|SHELL|TERM|([^=]*_)?(PASSWORD|PASSWD|PASS|SECRET|TOKEN|KEY))=|\n' | tr '\0' '\n' | sort > /etc/environment
 
-# Start runit
-exec runsvdir -P "${SVDIR:?}"
+# Start runit and wait for it to exit
+trap : HUP INT TERM
+status=0; runsvdir -P "${SVDIR:?}" || status=$?
+
+# Stop services
+sv force-stop "${SVDIR:?}"/* ||:
+
+# Terminate remaining processes
+if [ "${PPID:?}" -eq 1 ]; then
+	i=0; while [ "${i:?}" -lt "$((${SVWAIT:-7} * 10))" ] && pids=$(pgrep -Avx 'Xorg|Xvnc'); do
+		# shellcheck disable=SC2086
+		[ "${i:?}" -gt 0 ] || kill ${pids:?} 2>/dev/null ||:
+		sleep 0.1; i=$((i + 1))
+	done
+fi
+
+exit "${status:?}"

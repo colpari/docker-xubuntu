@@ -1,0 +1,58 @@
+#!/bin/sh
+
+set -eu
+
+sv start xrdp-sesman >/dev/null
+
+# Wait for the xrdp bootstrap session if enabled
+if [ -L "${SVDIR:?}"/xrdp-bootstrap ]; then
+	sv start xrdp-bootstrap >/dev/null
+fi
+
+exec 2>&1
+
+# Create the shared Xvnc session or reconnect to it if it already exists
+if ! output=$(sed -zn 's/^UNPRIVILEGED_USER_PASSWORD=//p' /proc/1/environ | xrdp-sesrun -t Xvnc-UDS -b 24 -F 0 "${UNPRIVILEGED_USER_NAME:?}"); then
+	printf '%s\n' "${output?}"
+	exit 1
+fi
+display=$(printf '%s\n' "${output:?}" | sed -n 's/^ok display=:\([0-9]\{1,\}\).*$/\1/p')
+
+# Xvnc session socket
+socket=/opt/xrdp/var/run/xrdp/${UNPRIVILEGED_USER_UID:?}/xrdp_display_${display:?}
+
+# Listen on IPv6 and IPv4, or only on IPv4 if IPv6 is not available
+if grep -q '^0\{31\}1 .* lo$' /proc/net/if_inet6 2>/dev/null; then
+	listen='::'
+else
+	listen='0.0.0.0'
+fi
+
+# Restart this service when the session ends
+( while sleep 5 && grep -qsa websockify /proc/"$$"/cmdline; do
+	if ! pgrep -u "${UNPRIVILEGED_USER_NAME:?}" -f "Xvnc :${display:?} " >/dev/null; then
+		kill "$$"
+		break
+	fi
+done ) &
+
+# Serve noVNC and proxy its connections to the session as the same user and groups as xrdp
+user=$(sed -n 's/^runtime_user=//p' /opt/xrdp/etc/xrdp/xrdp.ini)
+group=$(sed -n 's/^runtime_group=//p' /opt/xrdp/etc/xrdp/xrdp.ini)
+
+# Require HTTP Basic authentication with the unprivileged user credentials
+auth=/run/novnc-auth
+(umask 077 && { printf '%s:' "${UNPRIVILEGED_USER_NAME:?}"; sed -zn 's/^UNPRIVILEGED_USER_PASSWORD=//p' /proc/1/environ | tr -d '\0'; } > "${auth:?}")
+chown "${user:-root}:${group:-root}" "${auth:?}"
+
+exec setpriv --reuid="${user:-root}" --regid="${group:-root}" --init-groups env PYTHONPATH=/opt/websockify:/etc/sv/novnc python3 \
+	-W "ignore:no 'numpy' module" -m websockify \
+	--web /opt/noVNC/ \
+	--web-auth \
+	--auth-plugin basic_auth_file.BasicHTTPAuthFile \
+	--auth-source "${auth:?}" \
+	--cert "${XRDP_TLS_CRT_PATH:?}" \
+	--key "${XRDP_TLS_KEY_PATH:?}" \
+	--ssl-only \
+	--unix-target "${socket:?}" \
+	"${listen:?}:6080"

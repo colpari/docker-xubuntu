@@ -1,6 +1,6 @@
 # Xubuntu on Docker
 
-A Docker image based on Ubuntu 24.04 with the Xfce desktop environment,
+A Docker image based on Ubuntu 26.04 with the Xfce desktop environment,
 [xrdp](https://github.com/neutrinolabs/xrdp),
 [xrdp PulseAudio module](https://github.com/neutrinolabs/pulseaudio-module-xrdp) and
 [VirtualGL](https://github.com/VirtualGL/virtualgl).
@@ -36,10 +36,11 @@ services:
       - '/dev/dri:/dev/dri'
 ```
 
-> You will be able to connect to the container via SSH through 3322/TCP port and RDP through 3389/TCP port.
+> You will be able to connect to the container via SSH through 3322/TCP port, RDP through 3389/TCP port and, if enabled,
+> noVNC through 6080/TCP port (HTTPS).
 
 > **Important:** some software (like Firefox) need the shared memory to be increased, if you
-encounter any problem related to this you may use the `--shm-size` option.
+> encounter any problem related to this you may use the `--shm-size` option.
 
 ## Environment variables
 
@@ -49,8 +50,10 @@ encounter any problem related to this you may use the `--shm-size` option.
 * `UNPRIVILEGED_USER_PASSWORD`: unprivileged user password (`password` by default).
 * `UNPRIVILEGED_USER_GROUPS`: comma-separated list of additional GIDs for the unprivileged user (none by default).
 * `UNPRIVILEGED_USER_SHELL`: unprivileged user shell (`/bin/bash` by default).
+* `UNPRIVILEGED_USER_HOME`: unprivileged user home directory (`/home/${UNPRIVILEGED_USER_NAME}` by default).
 * `SERVICE_XRDP_BOOTSTRAP_ENABLED`: enable xrdp bootstrap service, initialises user session on startup (`false` by default).
 * `SERVICE_XORG_HEADLESS_ENABLED`: enable headless X server service (`false` by default).
+* `SERVICE_NOVNC_ENABLED`: enable noVNC service (`false` by default).
 
 ## License
 
